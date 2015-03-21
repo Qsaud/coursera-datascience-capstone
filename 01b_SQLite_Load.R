@@ -15,7 +15,7 @@ name.db <- 'en_US.sqlite'
 if(file.exists(name.db)){file.remove(name.db)}
 system2('sqlite3.exe', name.db, stdin = '01a_Create_DB.sql')
 
-db_en_us <- src_sqlite('en_US.sqlite') %T>% print() %T>% str()
+db_en_us <- src_sqlite(name.db) %T>% print() %T>% str()
 names.tbls <- src_tbls(db_en_us) %>% setNames(., .) %T>% print()
 
 BatchImport <- function(name.table, nrow.cache=10000) {
