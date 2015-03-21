@@ -1,0 +1,4 @@
+*.txt
+*.zip
+*.sqlite
+sqlite3.exe
