@@ -45,12 +45,13 @@ system2('sqlite3.exe', name.db, stdin = '01a_Create_DB.sql')
 db_en_us <- src_sqlite(name.db) %T>% print() %T>% str()
 names.tbls <- src_tbls(db_en_us) %>% setNames(., .) %T>% print()
 
-BatchImport <- function(name.table, nrow.cache=10000) { #name.table <- 'twitter'; nrow.cache=10000
+BatchImport <- function(name.table, nrow.cache=1000) { #name.table <- 'blogs'; nrow.cache=1000
   
   FetchChunk <- . %>%
     readLines(
       n = nrow.cache
       ,skipNul = TRUE
+      ,encoding = 'UTF-8'
     )
   
   ScrubCorpus <- . %>%
@@ -76,21 +77,24 @@ BatchImport <- function(name.table, nrow.cache=10000) { #name.table <- 'twitter'
   cache <- con.text %>% FetchChunk()
   
   while(length(cache)) {
-    
-    scrubbed <- cache %>%
-      sample(10) %>%
-      VectorSource() %>%
-      VCorpus() %>%
-      ScrubCorpus()
-    
-    dbWriteTable(
-      db_en_us$con
-      ,name.table
-      ,value = data.frame(
-        document=(scrubbed %>% CorpusToVector)
-        ,stringsAsFactors = FALSE
+    tryCatch({
+      scrubbed <- cache %>%
+        #sample(100) %>%
+        VectorSource() %>%
+        VCorpus() %>%
+        ScrubCorpus()
+      
+      dbWriteTable(
+        db_en_us$con
+        ,name.table
+        ,value = data.frame(
+          document=(scrubbed %>% CorpusToVector)
+          ,stringsAsFactors = FALSE
+        )
+        ,append = TRUE
       )
-      ,append = TRUE
+    }
+    ,error = function(e) e
     )
     
     cache <- con.text %>% FetchChunk()
@@ -101,6 +105,6 @@ BatchImport <- function(name.table, nrow.cache=10000) { #name.table <- 'twitter'
   return(tbl(db_en_us, name.table))
 }
 
-names.tbls %>% lapply(BatchImport)
+time.import <- system.time(names.tbls %>% lapply(BatchImport))
 
 tbl(db_en_us,'blogs') %>% print()
