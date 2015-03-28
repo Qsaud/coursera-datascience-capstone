@@ -46,7 +46,7 @@ Here are samples of the raw data in a SQLite database.  Rowcounts are reported:
 lapply(names.tbls,. %>% tbl(db_en_us, .))
 ```
 
-And here are samples of the scrubbed data.  A large portion of the Twitter data was rejected due to encoding conversions.  However, there is still more than enough data to build a useful prediction algorithm.
+And here are samples of the scrubbed data:
 ```{r, echo=FALSE}
 lapply(names.tbls,. %>% tbl(db_en_us_scrub, .))
 ```
