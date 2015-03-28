@@ -19,6 +19,7 @@ names.tbls <- src_tbls(db_en_us) %>% setNames(., .) %T>% print()
 ParseInput <- function(x) { #x <- 'I complete You'
   stopifnot(length(x)==1)
   x %>% 
+    iconv(to = 'ASCII' ,sub = '') %>%
     PlainTextDocument() %>% 
     stripWhitespace() %>% 
     removeNumbers() %>% 
@@ -27,6 +28,7 @@ ParseInput <- function(x) { #x <- 'I complete You'
     tolower()
 }
 
+ParseInput('I love to')
 
 QueryNextWords <- function(input, sample.size=1000) {
 
