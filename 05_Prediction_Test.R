@@ -30,20 +30,18 @@ ScrubInput <- function(x) { #x <- 'I complete You'
 
 ScrubInput('I love to')
 
-SampleNextWords <- function(input.raw, sample.size=10000) {
+SampleNextWords <- function(input, sample.size=10000) {
   
-  input.scrub <- ScrubInput(input.raw)
-
   BuildSingleTable <- function(name.table) {#name.table <- 'news'; input <- 'complete th'; sample.size <- 100
     paste0(
       'select case when instr(remaining, " ") = 0 then remaining'
       ,' else substr(remaining, 1, instr(remaining, " ")-1) end as word_next'
       #'select *'
       ,' from ('
-        ,'select substr(document, instr(document, "',input.scrub,' ") + ', nchar(input.scrub) + 1, ') as remaining'
+        ,'select substr(document, instr(document, "',input,' ") + ', nchar(input) + 1, ') as remaining'
         ,' from ', name.table
-        ,' where document glob "* ', input.scrub, ' *"'
-        ,' or substr(document,', nchar(input.scrub), ') = "', input.scrub, '"'
+        ,' where document glob "* ', input, ' *"'
+        ,' or substr(document,', nchar(input), ') = "', input, '"'
         #,' order by random()' # Give stochastic results, but slower
         ,' limit ', sample.size
       ,')'
@@ -65,5 +63,78 @@ SampleNextWords('I love you')
 
 tbl(
   db_en_us
-  ,'he' %>% SampleNextWords(10000)
+  ,'he' %>% ScrubInput() %>% SampleNextWords(10000)
   ) %>% arrange(desc(freq)) %>% collect()
+
+
+PredictNextWord <- function(input.raw) {#input.raw <- 'i like strawberry'
+  input.considered <- input.raw %>%
+    ScrubInput() %>%
+    strsplit('\\s+') %>% 
+    '[['(1) %>%
+    tail(3)
+  
+  next.words <- db_en_us %>% 
+    tbl(
+      input.considered %>%
+        paste(collapse=' ') %>%
+        SampleNextWords(1000)
+    ) %>% 
+    collect()
+  
+  if(length(input.considered) == 3){
+    back.two <- db_en_us %>% 
+      tbl(
+        input.considered %>%
+          tail(2) %>%
+          paste(collapse=' ') %>%
+          SampleNextWords(1000)
+      ) %>% 
+      collect() %>%
+      mutate(
+        prop = freq/sum(freq)
+        ,ridge = 100 * prop
+        ) %>%
+      select(word_next, ridge)
+    next.words <- next.words %>%
+      full_join(back.two, 'word_next') %>%
+      mutate(
+        freq = ifelse(is.na(freq), 0, freq)
+        ,ridge = ifelse(is.na(ridge), 0, ridge)
+        ,freq = freq + ridge
+      ) %>%
+      select(word_next, freq)
+  }
+  
+  if(length(input.considered) > 1){
+    back.one <- db_en_us %>% 
+      tbl(
+        input.considered %>%
+          tail(1) %>%
+          SampleNextWords(1000)
+      ) %>% 
+      collect() %>%
+      mutate(
+        prop = freq/sum(freq)
+        ,ridge = 42 * prop
+      ) %>%
+      select(word_next, ridge)
+    next.words <- next.words %>%
+      full_join(back.one, 'word_next') %>%
+      mutate(
+        freq = ifelse(is.na(freq), 0, freq)
+        ,ridge = ifelse(is.na(ridge), 0, ridge)
+        ,freq = freq + ridge
+      ) %>%
+      select(word_next, freq)
+  }
+  
+  return(next.words %>% arrange(desc(freq)) %$% word_next[1])
+
+}
+
+PredictNextWord('i like strawberry')
+PredictNextWord('real')
+
+strsplit('I love  you','\\s+')
+
