@@ -16,7 +16,7 @@ name.db <- 'en_US.scrub.sqlite'
 db_en_us <- src_sqlite(name.db) %T>% print() %T>% str()
 names.tbls <- src_tbls(db_en_us) %>% setNames(., .) %T>% print()
 
-ParseInput <- function(x) { #x <- 'I complete You'
+ScrubInput <- function(x) { #x <- 'I complete You'
   stopifnot(length(x)==1)
   x %>% 
     iconv(to = 'ASCII' ,sub = '') %>%
@@ -28,9 +28,9 @@ ParseInput <- function(x) { #x <- 'I complete You'
     tolower()
 }
 
-ParseInput('I love to')
+ScrubInput('I love to')
 
-QueryNextWords <- function(input, sample.size=1000) {
+SampleNextWords <- function(input, sample.size=10000) {
 
   BuildSingleTable <- function(name.table) {#name.table <- 'news'; input <- 'complete th'; sample.size <- 100
     paste0(
@@ -51,9 +51,9 @@ QueryNextWords <- function(input, sample.size=1000) {
   sql(paste(lapply(names.tbls, BuildSingleTable), collapse = ' union all '))
 }
 
-QueryNextWords('I love you')
+SampleNextWords('I love you')
 
 tbl(
   db_en_us
-  ,'me about his' %>% ParseInput() %>% QueryNextWords(10000)
+  ,'i love' %>% ScrubInput() %>% SampleNextWords(10000)
   ) %>% collect() %$% word_next %>% table() %>% sort()
