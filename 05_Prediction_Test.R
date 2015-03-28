@@ -30,7 +30,9 @@ ScrubInput <- function(x) { #x <- 'I complete You'
 
 ScrubInput('I love to')
 
-SampleNextWords <- function(input, sample.size=10000) {
+SampleNextWords <- function(input.raw, sample.size=10000) {
+  
+  input.scrub <- ScrubInput(input.raw)
 
   BuildSingleTable <- function(name.table) {#name.table <- 'news'; input <- 'complete th'; sample.size <- 100
     paste0(
@@ -38,22 +40,30 @@ SampleNextWords <- function(input, sample.size=10000) {
       ,' else substr(remaining, 1, instr(remaining, " ")-1) end as word_next'
       #'select *'
       ,' from ('
-        ,'select substr(document, instr(document, "',input,' ") + ', nchar(input) + 1, ') as remaining'
+        ,'select substr(document, instr(document, "',input.scrub,' ") + ', nchar(input.scrub) + 1, ') as remaining'
         ,' from ', name.table
-        ,' where document glob "*', input, ' *"'
-        ,' order by random()'
+        ,' where document glob "* ', input.scrub, ' *"'
+        ,' or substr(document,', nchar(input.scrub), ') = "', input.scrub, '"'
+        #,' order by random()' # Give stochastic results, but slower
         ,' limit ', sample.size
       ,')'
       ,' where length(remaining) > 0'
     )
   }
   
-  sql(paste(lapply(names.tbls, BuildSingleTable), collapse = ' union all '))
+  all.tables <- paste(lapply(names.tbls, BuildSingleTable), collapse = ' union all ')
+  
+  sql(paste(
+    'select word_next, count(*) as freq'
+    ,'from ('
+    ,all.tables
+    ,') group by word_next'
+    ))
 }
 
 SampleNextWords('I love you')
 
 tbl(
   db_en_us
-  ,'i love' %>% ScrubInput() %>% SampleNextWords(10000)
-  ) %>% collect() %$% word_next %>% table() %>% sort()
+  ,'he' %>% SampleNextWords(10000)
+  ) %>% arrange(desc(freq)) %>% collect()
