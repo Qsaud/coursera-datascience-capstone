@@ -45,13 +45,18 @@ system2('sqlite3.exe', name.db, stdin = '01a_Create_DB.sql')
 db_en_us <- src_sqlite(name.db) %T>% print() %T>% str()
 names.tbls <- src_tbls(db_en_us) %>% setNames(., .) %T>% print()
 
-BatchImport <- function(name.table, nrow.cache=1000) { #name.table <- 'blogs'; nrow.cache=1000
+BatchImport <- function(name.table, nrow.cache=1000) { #name.table <- 'blogs'; nrow.cache=10
   
   FetchChunk <- . %>%
     readLines(
       n = nrow.cache
       ,skipNul = TRUE
       ,encoding = 'UTF-8'
+    ) %>%
+    iconv(
+      from = 'UTF-8'
+      ,to = 'ASCII'
+      ,sub = ''
     )
   
   ScrubCorpus <- . %>%
