@@ -1,0 +1,133 @@
+```{r, echo=FALSE, results='hide', message=FALSE}
+require(RSQLite)
+require(dplyr)
+require(magrittr)
+require(tm)
+require(slam)
+require(RWeka)
+
+assign('n_distinct', function(x) {build_sql("COUNT(DISTINCT ", x, ")")}, envir=base_agg)
+assign('length', sql_prefix('length', 1), envir=base_agg)
+assign('glob', sql_prefix('glob', 2), envir=base_agg)
+assign('like', sql_prefix('like', 2), envir=base_agg)
+
+dir.repo <- paste0(Sys.getenv('PathGitHubRepos'), '/coursera-datascience-capstone/') %T>% print()
+setwd(dir.repo)
+
+db_en_us <- src_sqlite('en_US.sqlite') %T>% print() %T>% str()
+names.tbls <- src_tbls(db_en_us) %>% setNames(., .) %T>% print()
+db_en_us_scrub <- src_sqlite('en_US.scrub.sqlite') %T>% print() %T>% str()
+```
+
+## Coursera - Data Science Capstone
+### Milestone Report
+### Shea Parkes
+
+At this time I have successfully completed the following:
+
+  1. Downloaded the data.
+  1. Loaded the raw text into a SQLite database.
+  1. Built a scrubbing pipeline that prepares the text for predective modeling.  It does the following steps:
+    1. Remove whitespace
+    1. Remove numbers
+    1. Remove punctuation
+    1. Convert to lowercase
+    1. Stem the words (remove their ~conjugation)
+    1. Remove blatant profanity
+    1. It does **not** remove stop words (e.g. `the`, `and`) because they are likely needed for predicting the next word to be typed.
+  1. Store the scrubbed text in another SQLite database.
+  1. Build some simple functions to explore frequencies of words and N-grams
+
+
+## Loaded data
+
+Here are samples of the raw data in a SQLite database.  Rowcounts are reported:
+```{r, echo=FALSE}
+lapply(names.tbls,. %>% tbl(db_en_us, .))
+```
+
+And here are samples of the scrubbed data.  A large portion of the Twitter data was rejected due to encoding conversions.  However, there is still more than enough data to build a useful prediction algorithm.
+```{r, echo=FALSE}
+lapply(names.tbls,. %>% tbl(db_en_us_scrub, .))
+```
+
+Rough estimates of word counts from the scrubbed database:
+```{r, echo=FALSE}
+lapply(names.tbls,function(name.tbl) {
+  tbl(db_en_us,sql(paste(
+    "select sum(length(document) - length(replace(document,' ','')) + 1) as word_count from"
+    ,name.tbl
+  ))) %>% collect() %$% word_count
+  })
+```
+
+
+```{r, echo=FALSE, results='hide'}
+GetSample <- function(name.tbl, sample.size) {
+  tbl(db_en_us_scrub, sql(paste(
+    'select * from'
+    ,name.tbl
+    ,'order by random() limit'
+    ,sample.size
+  ))) %>%
+    collect() %$%
+    document
+}
+
+CalcWordFreq <- . %>%
+  VectorSource() %>% 
+  VCorpus() %>% 
+  TermDocumentMatrix() %>%
+  removeSparseTerms(1-1e-4) %>%
+  row_sums() %>%
+  prop.table()
+
+NGramFactory <- function(n.words) {
+  function(x) {
+    NGramTokenizer(
+      x
+      ,Weka_control(min=n.words, max=n.words)
+    )
+  }
+}
+
+CalcNGramFreq <- function(x, n.gram) {
+  x %>%
+  VectorSource() %>% 
+  VCorpus() %>% 
+  TermDocumentMatrix(control=list(tokenize=NGramFactory(n.gram))) %>%
+  removeSparseTerms(1-1e-4) %>%
+  row_sums() %>%
+  prop.table()
+}
+
+MakeDotChart <- function(name.tbl, sample.size, n.gram) {
+  GetSample(name.tbl, sample.size) %>%
+  CalcNGramFreq(n.gram) %>%
+  sort() %>%
+  tail(24) %>%
+  dotchart(
+    xlab=paste0('Proportion of sample ', n.gram, '-grams')
+    ,main=paste0(name.tbl, ' table (', sample.size, ' samples)')
+    )
+}
+```
+
+
+
+
+## N-Gram frequency charts
+
+The following charts show sample frequencies of various N-Grams from various scrubbed tables:
+
+```{r, echo=FALSE}
+MakeDotChart('blogs', 1000, 1)
+MakeDotChart('blogs', 1000, 2)
+MakeDotChart('twitter', 10000, 3)
+MakeDotChart('news', 10000, 3)
+```
+
+
+## Prediction algorithm plans
+
+I plan on utilizing the N-Gram frequencies above to calculate the empricially most likely next word for each N-word combination.  I will have to do credibility/ridge adjustments for rare word combinations to improve the quality of the suggestions.  I will also struggle to keep the performance and resource utilization balanced.
