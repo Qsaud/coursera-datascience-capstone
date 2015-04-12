@@ -1,0 +1,37 @@
+Coursera Data Science Capstone - Pitch Deck
+========================================================
+author: Shea Parkes
+
+Description of Project
+========================================================
+I was asked to build a text prediction engine; one that would help suggest the likely next word that would come after a given phrase.
+I was provided with a large sample of English texts from various sources (blogs, Twitter), and requested to ultimately make a Web application using [Shiny](http://shiny.rstudio.com/).
+
+
+Description of my App
+========================================================
+My Shiny application can be accessed [here](https://bias-variance.shinyapps.io/datascience-capstone-app/).  It is a trivial demonstration of the algorithm designed.  It provides a single text entry box to provide a phrase to use for prediction, and it provides a single output widget: a prediction of the next word in the phrase.
+
+
+How the app makes its predictions
+========================================================
+When a phrase of text is provided, the following steps occur to make the prediction:
+<small style="font-size:.5em">
+
+  * The text is scrubbed (strips puncuation and extra whitespace, stems the words, converts to lowercase, etc.)
+  * The last 3 words of the phrase are used to query a database of text samples and a frequency of "next words"
+    * If less than 3 words are in the phrase, the this step is skipped (and so on below)
+  * The last 2 words and then the last word are also used to query the database to get a frequency of "next words"
+  * The frequencies of "next words" are then averaged together with the most weight given to the query that used the most words (i.e. a 3-word query carries more weight than a 2-word query)
+    * The number of results from a 3-word query is generally smallest though, so the shorter queries still often influence the answer.
+    * This blending is equivalent to doing something like [Ridge regression](http://en.wikipedia.org/wiki/Tikhonov_regularization) or applying [Stein's Shrinkage](http://en.wikipedia.org/wiki/James%E2%80%93Stein_estimator)
+  * The "next word" with the highest blended frequence is provided as an answer.
+
+</small>
+
+Next steps that could be taken to improve the application
+========================================================
+There are a number of improvements I could make to the application, given more time and priority:
+  * Pre-calculate the N-Gram frequencies and store them in a more optimized format
+  * Re-stem the predictions to avoid providing un-conjugated answers
+  * Increase the amount of text utilized to make the "next word" frequencies
