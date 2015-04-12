@@ -56,13 +56,16 @@ SampleNextWords <- function(input, sample.size=10000) {
 }
 
 
-PredictNextWord <- function(input.raw) {#input.raw <- 'amy and i havebee'
+PredictNextWord <- function(input.raw, updateProgress = NULL) {#input.raw <- 'I love th'
+  
+  if(is.function(updateProgress)){updateProgress('Scrubbing inputs')}
   input.considered <- input.raw %>%
     ScrubInput() %>%
     strsplit('\\s+') %>% 
     '[['(1) %>%
     tail(3)
   
+  if(is.function(updateProgress)){updateProgress(paste0('Quering ', length(input.considered)+1,'-Grams'))}
   next.words <- db_en_us %>% 
     tbl(
       input.considered %>%
@@ -72,6 +75,7 @@ PredictNextWord <- function(input.raw) {#input.raw <- 'amy and i havebee'
     collect()
   
   if(length(input.considered) == 3){
+    if(is.function(updateProgress)){updateProgress('Quering 3-Grams')}
     back.two <- db_en_us %>% 
       tbl(
         input.considered %>%
@@ -96,6 +100,7 @@ PredictNextWord <- function(input.raw) {#input.raw <- 'amy and i havebee'
   }
   
   if(length(input.considered) > 1){
+    if(is.function(updateProgress)){updateProgress('Quering 2-Grams')}
     back.one <- db_en_us %>% 
       tbl(
         input.considered %>%
@@ -117,6 +122,8 @@ PredictNextWord <- function(input.raw) {#input.raw <- 'amy and i havebee'
       ) %>%
       select(word_next, freq)
   }
+  next.words %<>%
+    filter(word_next != '')
   
   return(ifelse(nrow(next.words) > 0, next.words %>% arrange(desc(freq)) %$% word_next[1], 'and'))
   
